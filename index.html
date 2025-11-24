@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BioMechanics Pro V5</title>
+
+    <style>
+        :root {
+            /* Dark Mode (Default) */
+            --bg-color: #0f0f12;
+            --surface-color: rgba(30, 30, 35, 0.8);
+            --card-bg: linear-gradient(145deg, #1a1a1f, #141418);
+            --accent-color: #00f2ff;
+            --accent-glow: rgba(0, 242, 255, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #8b8b95;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --dashed-border: rgba(255, 255, 255, 0.2);
+        }
+
+        body.light-mode {
+            /* Light Mode */
+            --bg-color: #f2f4f8;
+            --surface-color: rgba(255, 255, 255, 0.9);
+            --card-bg: linear-gradient(145deg, #ffffff, #f0f0f0);
+            --accent-color: #007aff;
+            --accent-glow: rgba(0, 122, 255, 0.2);
+            --text-primary: #1c1c1e;
+            --text-secondary: #8e8e93;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --dashed-border: rgba(0, 0, 0, 0.15);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-color);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Roboto, sans-serif;
+            overflow: hidden;
+            transition: background 0.3s ease;
+        }
+
+        /* 主工作区 - 居中布局 */
+        .workspace {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 画布容器 */
+        .canvas-wrapper {
+            position: relative;
+            /* 初始状态是一个方块，图片加载后自适应 */
+            width: 90%; 
+            height: 80vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        canvas {
+            display: none; /* 默认隐藏，有图再显示 */
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            cursor: crosshair;
+        }
+
+        /* --- 新设计的上传卡片 (Empty State) --- */
+        .empty-state {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            background: var(--card-bg);
+            border: 2px dashed var(--dashed-border);
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute;
+            z-index: 10;
+        }
+
+        /* 悬停/拖拽时的效果 */
+        .empty-state:hover, .empty-state.drag-over {
+            border-color: var(--accent-color);
+            background: var(--surface-color);
+            transform: scale(1.02);
+            box-shadow: 0 10px 40px var(--accent-glow);
+        }
+
+        .upload-icon-wrapper {
+            width: 80px;
+            height: 80px;
+            background: rgba(128, 128, 128, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .empty-state:hover .upload-icon-wrapper {
+            background: var(--accent-color);
+            color: #fff;
+        }
+
+        .upload-icon {
+            width: 40px;
+            height: 40px;
+            stroke: var(--text-secondary);
+            stroke-width: 1.5;
+            transition: stroke 0.3s;
+        }
+
+        .empty-state:hover .upload-icon {
+            stroke: #fff;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--surface-color);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 16px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 50;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .tool-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .tool-btn:hover { background: rgba(128,128,128,0.1); }
+        
+        .tool-btn.active {
+            background: var(--accent-color);
+            color: #fff; /* 无论日夜，激活都是白字 */
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+        
+        /* 确保激活状态下的图标颜色 */
+        .tool-btn.active svg { stroke: #fff; } 
+        .tool-btn svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+        .separator { width: 100%; height: 1px; background: var(--border-color); margin: 4px 0; }
+
+        /* 缩放条 */
+        .zoom-panel {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface-color);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            padding: 12px 24px;
+            border-radius: 30px;
+            display: none; /* 默认隐藏，有图显示 */
+            align-items: center;
+            gap: 15px;
+            color: var(--text-primary);
+            z-index: 50;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 150px;
+            height: 4px;
+            background: rgba(128,128,128,0.3);
+            border-radius: 2px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border: 2px solid var(--accent-color);
+        }
+
+        /* 提示 */
+        #msg {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: var(--surface-color);
+            color: var(--text-primary);
+            padding: 10px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            border: 1px solid var(--border-color);
+        }
+        #msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        @media (max-width: 600px) {
+            .sidebar {
+                flex-direction: row;
+                top: auto; bottom: 20px; left: 20px; right: 20px;
+                transform: none;
+                height: auto;
+                justify-content: space-between;
+                padding: 10px 15px;
+            }
+            .separator { width: 1px; height: 24px; margin: 0 4px; }
+            .zoom-panel { bottom: 90px; }
+            .empty-state { height: 240px; width: 85%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="msg">Ready</div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="上传">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="separator"></div>
+        <button class="tool-btn" onclick="toggleTheme()" id="btn-theme">
+            <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="separator"></div>
+        <button class="tool-btn active" onclick="setMode('normal')" id="btn-normal">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="none" fill="transparent"/><path d="M3 21l9-18 9 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="tool-btn" onclick="setMode('horizontal')" id="btn-horizontal">
+            <svg viewBox="0 0 24 24"><path d="M3 20h18" stroke-width="3" stroke-linecap="round"/><path d="M5 12h14" stroke-dasharray="4 4" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tool-btn" onclick="setMode('vertical')" id="btn-vertical">
+            <svg viewBox="0 0 24 24"><path d="M20 3v18" stroke-width="3" stroke-linecap="round"/><path d="M12 5v14" stroke-dasharray="4 4" stroke-linecap="round"/></svg>
+        </button>
+        <div class="separator"></div>
+        <button class="tool-btn" onclick="undoLast()"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="tool-btn" onclick="clearMeasurements()"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <!-- 主工作区 -->
+    <div class="workspace" id="dropZone">
+        <div class="canvas-wrapper" id="canvasWrapper">
+            
+            <!-- 这里是重点：专业的前端上传界面 -->
+            <div class="empty-state" id="emptyState" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon-wrapper">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="empty-title">点击或拖拽上传图片</div>
+                <div class="empty-desc">支持 JPG, PNG 高清原图</div>
+            </div>
+
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 缩放控制 -->
+    <div class="zoom-panel" id="zoomPanel">
+        <span>🔍</span>
+        <input type="range" id="zoomSlider" min="0.5" max="3.0" step="0.05" value="1.0">
+        <span id="zoomValue" style="min-width: 45px; text-align:right">100%</span>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const emptyState = document.getElementById('emptyState');
+    const zoomPanel = document.getElementById('zoomPanel');
+    const wrapper = document.getElementById('canvasWrapper');
+    const dropZone = document.getElementById('dropZone');
+
+    let img = new Image();
+    let measurements = [];
+    let currentPoints = [];
+    let currentMode = 'normal';
+    let isDragging = false;
+    let dragTarget = null;
+    let isDarkMode = true;
+
+    // --- 1. 文件处理与UI切换 ---
+    
+    function handleFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            img = new Image();
+            img.onload = function() {
+                // UI 状态改变
+                emptyState.style.display = 'none'; // 隐藏上传卡片
+                canvas.style.display = 'block';    // 显示画布
+                zoomPanel.style.display = 'flex';  // 显示缩放条
+                
+                // 自动适应大小
+                canvas.width = img.width;
+                canvas.height = img.height;
+                wrapper.style.height = '85vh'; 
+                wrapper.style.width = 'auto'; // 让wrapper宽度适应图片比例
+
+                measurements = [];
+                currentPoints = [];
+                resetZoom();
+                draw();
+                showMsg("图片加载完成");
+            }
+            img.src = event.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+
+    // Input Change
+    document.getElementById('fileInput').addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    // Drag & Drop (拖拽上传支持)
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        emptyState.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        emptyState.classList.remove('drag-over');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        emptyState.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+
+    // --- 2. 绘图逻辑 (继承自V4) ---
+    function getThemeColors() {
+        if (isDarkMode) {
+            return { line: '#00f2ff', ref: 'rgba(255,255,255,0.7)', point: '#00f2ff', stroke: '#000', text: '#fff' };
+        } else {
+            return { line: '#007aff', ref: 'rgba(0,0,0,0.6)', point: '#007aff', stroke: '#fff', text: '#1c1c1e' };
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!img.src) return;
+
+        ctx.drawImage(img, 0, 0);
+        const c = getThemeColors();
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        measurements.forEach(m => drawMeasurement(m.points, m.type, c));
+        
+        // 正在画的点
+        if (currentPoints.length > 0) {
+            currentPoints.forEach(p => drawPoint(p, '#ff3b30', c));
+            if (currentPoints.length >= 2) {
+                ctx.beginPath();
+                ctx.moveTo(currentPoints[0].x, currentPoints[0].y);
+                ctx.lineTo(currentPoints[1].x, currentPoints[1].y);
+                ctx.strokeStyle = '#ff3b30';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            }
+        }
+    }
+
+    function drawMeasurement(points, type, c) {
+        if (type === 'normal') {
+            const [p1, p2, p3] = points;
+            drawSector(p2, p1, p3, c);
+            drawLine(p1, p2, c.line);
+            drawLine(p2, p3, c.line);
+            drawPoint(p1, '#fff', c);
+            drawPoint(p2, c.point, c);
+            drawPoint(p3, '#fff', c);
+            drawText(p1, p2, p3, c);
+        } else {
+            const [p1, p2] = points;
+            const ref = (type === 'horizontal') ? {x:p1.x+400, y:p1.y} : {x:p1.x, y:p1.y+400};
+            drawLine(p1, p2, c.line);
+            drawDashed(p1, ref, c.ref);
+            drawPoint(p1, c.point, c);
+            drawPoint(p2, '#fff', c);
+            drawText(ref, p1, p2, c);
+        }
+    }
+
+    // 基础绘图函数封装
+    function drawLine(p1, p2, color) {
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = color; ctx.lineWidth = 5; 
+        ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 5; ctx.stroke(); ctx.shadowBlur = 0;
+    }
+    function drawDashed(p1, p2, color) {
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.setLineDash([12, 12]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    function drawPoint(p, fill, c) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 25, 0, Math.PI*2); ctx.fillStyle="rgba(128,128,128,0.1)"; ctx.fill(); // 触摸区
+        ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI*2); ctx.fillStyle=fill; ctx.fill();
+        ctx.strokeStyle=c.stroke; ctx.lineWidth=3; ctx.stroke();
+    }
+    function drawSector(center, p1, p3, c) {
+        const r = 70;
+        const a1 = Math.atan2(p1.y - center.y, p1.x - center.x);
+        const a2 = Math.atan2(p3.y - center.y, p3.x - center.x);
+        ctx.beginPath(); ctx.moveTo(center.x, center.y); ctx.arc(center.x, center.y, r, a1, a2);
+        ctx.fillStyle = isDarkMode ? "rgba(0,242,255,0.15)" : "rgba(0,122,255,0.15)"; ctx.fill();
+    }
+    function drawText(p1, vertex, p3, c) {
+        const a1 = Math.atan2(p1.y - vertex.y, p1.x - vertex.x);
+        const a2 = Math.atan2(p3.y - vertex.y, p3.x - vertex.x);
+        let deg = Math.abs((a2 - a1) * 180 / Math.PI);
+        if (deg > 180) deg = 360 - deg;
+        const txt = Math.round(deg) + "°";
+        ctx.font = "bold 50px -apple-system, sans-serif";
+        ctx.strokeStyle = isDarkMode ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 8; ctx.strokeText(txt, vertex.x+40, vertex.y-40);
+        ctx.fillStyle = c.text; ctx.fillText(txt, vertex.x+40, vertex.y-40);
+    }
+
+    // --- 3. 交互逻辑 (维持V4版的大触控区) ---
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return {
+            x: (t.clientX - rect.left) * (canvas.width / rect.width),
+            y: (t.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function checkHit(pos) {
+        for(let i=0; i<measurements.length; i++) {
+            for(let j=0; j<measurements[i].points.length; j++) {
+                if(Math.hypot(measurements[i].points[j].x - pos.x, measurements[i].points[j].y - pos.y) < 80)
+                    return {groupIndex:i, pointIndex:j};
+            }
+        }
+        return null;
+    }
+
+    // 事件监听
+// --- 替换原有的 start 函数 ---
+    function start(e) {
+        // 1. 如果是双指（为了缩放/滚动），直接退出，不画点
+        if (e.touches && e.touches.length > 1) return;
+        
+        if (!img.src) return;
+
+        // ★★★ 核心修复代码开始 ★★★
+        // 如果检测到是触摸事件，阻止默认行为（阻止滚动 + 阻止后续的模拟鼠标点击）
+        if (e.type === 'touchstart') {
+            e.preventDefault(); 
+        }
+        // ★★★ 核心修复代码结束 ★★★
+
+        const pos = getPos(e);
+        const hit = checkHit(pos);
+        
+        if (hit) {
+            isDragging = true;
+            dragTarget = hit;
+            // 这里也防止拖拽时触发滚动
+            e.preventDefault();
+        } else if (e.type === 'mousedown' || e.type === 'touchstart') {
+            currentPoints.push(pos);
+            const req = (currentMode === 'normal') ? 3 : 2;
+            
+            if (currentPoints.length === req) {
+                measurements.push({type: currentMode, points: [...currentPoints]});
+                currentPoints = [];
+                // 震动反馈
+                if (navigator.vibrate) navigator.vibrate(50);
+            }
+            draw();
+        }
+    }
+    function move(e) {
+        if(isDragging && dragTarget) {
+            e.preventDefault();
+            measurements[dragTarget.groupIndex].points[dragTarget.pointIndex] = getPos(e);
+            draw();
+        }
+    }
+    function end() { isDragging=false; dragTarget=null; }
+
+    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, {passive:false}); canvas.addEventListener('touchmove', move, {passive:false}); canvas.addEventListener('touchend', end, {passive:false});
+
+    // --- 4. 辅助功能 ---
+    function toggleTheme() {
+        isDarkMode = !isDarkMode;
+        document.body.classList.toggle('light-mode');
+        const btn = document.getElementById('btn-theme');
+        btn.innerHTML = isDarkMode 
+            ? '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="1" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="21" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-linecap="round" stroke-linejoin="round"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-linecap="round" stroke-linejoin="round"/><line x1="1" y1="12" x2="3" y2="12" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="23" y2="12" stroke-linecap="round" stroke-linejoin="round"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-linecap="round" stroke-linejoin="round"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        draw();
+    }
+    
+    function setMode(m) {
+        currentMode = m; currentPoints=[];
+        document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+        document.getElementById('btn-'+m).classList.add('active');
+        draw();
+        showMsg(m==='normal'?'3点测角':'基准线模式');
+    }
+
+    function resetZoom() { document.getElementById('zoomSlider').value=1.0; wrapper.style.height='85vh'; document.getElementById('zoomValue').innerText='100%'; }
+    document.getElementById('zoomSlider').addEventListener('input', (e)=>{
+        wrapper.style.height = (85 * e.target.value) + 'vh';
+        document.getElementById('zoomValue').innerText = Math.round(e.target.value*100)+'%';
+    });
+
+    function undoLast() { if(currentPoints.length) currentPoints.pop(); else if(measurements.length) measurements.pop(); draw(); }
+    function clearMeasurements() { measurements=[]; currentPoints=[]; draw(); showMsg("已清空"); }
+    function showMsg(t) { const m=document.getElementById('msg'); m.innerText=t; m.classList.add('show'); setTimeout(()=>m.classList.remove('show'),2000); }
+
+</script>
+</body>
+</html>
