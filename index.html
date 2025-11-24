@@ -269,6 +269,44 @@
             border: 2px solid var(--accent-color);
         }
 
+        /* 关闭按钮 */
+        .close-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--surface-color);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: none; /* 默认隐藏，有图时显示 */
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 59, 48, 0.1);
+            border-color: #ff3b30;
+            color: #ff3b30;
+            transform: scale(1.05);
+        }
+
+        .close-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         /* 提示 */
         #msg {
             position: fixed;
@@ -291,6 +329,14 @@
         #msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
         @media (max-width: 600px) {
+            /* 移动端关闭按钮适配 */
+            .close-btn {
+                top: max(20px, env(safe-area-inset-top) + 10px);
+                right: 15px;
+                width: 44px;
+                height: 44px;
+            }
+
             .sidebar {
                 flex-direction: row;
                 top: auto;
@@ -358,6 +404,14 @@
 
     <div id="msg">Ready</div>
 
+    <!-- 关闭按钮 -->
+    <button class="close-btn" id="closeBtn" onclick="closeImage()">
+        <svg viewBox="0 0 24 24" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
+
     <!-- 侧边栏 -->
     <div class="sidebar">
         <button class="tool-btn" onclick="toggleTheme()" id="btn-theme">
@@ -413,6 +467,7 @@
     const zoomPanel = document.getElementById('zoomPanel');
     const wrapper = document.getElementById('canvasWrapper');
     const dropZone = document.getElementById('dropZone');
+    const closeBtn = document.getElementById('closeBtn');
 
     let img = new Image();
     let measurements = [];
@@ -426,7 +481,7 @@
     
     function handleFile(file) {
         if (!file || !file.type.startsWith('image/')) return;
-        
+
         const reader = new FileReader();
         reader.onload = function(event) {
             img = new Image();
@@ -435,11 +490,12 @@
                 emptyState.style.display = 'none'; // 隐藏上传卡片
                 canvas.style.display = 'block';    // 显示画布
                 zoomPanel.style.display = 'flex';  // 显示缩放条
-                
+                closeBtn.style.display = 'flex';   // 显示关闭按钮
+
                 // 自动适应大小
                 canvas.width = img.width;
                 canvas.height = img.height;
-                wrapper.style.height = '85vh'; 
+                wrapper.style.height = '85vh';
                 wrapper.style.width = 'auto'; // 让wrapper宽度适应图片比例
 
                 measurements = [];
@@ -659,6 +715,39 @@
 
     function undoLast() { if(currentPoints.length) currentPoints.pop(); else if(measurements.length) measurements.pop(); draw(); }
     function clearMeasurements() { measurements=[]; currentPoints=[]; draw(); showMsg("已清空"); }
+
+    // 关闭图片功能
+    function closeImage() {
+        // 重置图片对象
+        img = new Image();
+        img.src = '';
+
+        // 清空测量数据
+        measurements = [];
+        currentPoints = [];
+
+        // UI 状态重置到初始状态
+        emptyState.style.display = 'flex';     // 显示上传卡片
+        canvas.style.display = 'none';         // 隐藏画布
+        zoomPanel.style.display = 'none';      // 隐藏缩放条
+        closeBtn.style.display = 'none';       // 隐藏关闭按钮
+
+        // 重置画布容器大小
+        wrapper.style.height = '80vh';
+        wrapper.style.width = '90%';
+
+        // 重置文件输入
+        document.getElementById('fileInput').value = '';
+
+        // 清空画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 重置缩放
+        resetZoom();
+
+        showMsg("已关闭图片，可以重新上传");
+    }
+
     function showMsg(t) { const m=document.getElementById('msg'); m.innerText=t; m.classList.add('show'); setTimeout(()=>m.classList.remove('show'),2000); }
 
     // 检测工具条是否需要滚动
